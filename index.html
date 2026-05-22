@@ -261,6 +261,157 @@
           </div>
         </div>
       </section>
+
+      <section class="border-t border-slate-200 pt-8">
+        <p class="text-xs font-medium uppercase tracking-wide text-violet-600">
+          Panel coordinador académico
+        </p>
+        <h2 class="mt-1 text-lg font-semibold text-slate-900">
+          Creación de cursos
+        </h2>
+        <p class="mt-1 text-sm text-slate-600">
+          Define cursos o grados académicos por sede para asignar después
+          estudiantes y docentes.
+        </p>
+
+        <div
+          id="cursos-sin-instituciones"
+          class="mt-4 rounded-xl border border-dashed border-slate-300 bg-white px-6 py-8 text-center text-sm text-slate-500"
+        >
+          Primero registra al menos una institución en el panel de
+          superadministrador.
+        </div>
+
+        <div
+          id="cursos-sin-sedes"
+          class="mt-4 hidden rounded-xl border border-dashed border-slate-300 bg-white px-6 py-8 text-center text-sm text-slate-500"
+        >
+          La institución seleccionada no tiene sedes. Configúralas en el panel
+          de administrador institucional.
+        </div>
+
+        <div id="cursos-panel" class="mt-4 hidden space-y-4">
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <label for="institucion-curso" class="mb-1 block text-sm font-medium">
+                Institución
+              </label>
+              <select
+                id="institucion-curso"
+                class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-200"
+              ></select>
+            </div>
+
+            <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <label for="sede-curso" class="mb-1 block text-sm font-medium">
+                Sede
+              </label>
+              <select
+                id="sede-curso"
+                class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-200"
+              ></select>
+            </div>
+          </div>
+
+          <form
+            id="form-curso"
+            class="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
+          >
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div class="sm:col-span-2">
+                <label for="curso-nombre" class="mb-1 block text-sm font-medium">
+                  Nombre del curso o grado
+                </label>
+                <input
+                  id="curso-nombre"
+                  name="nombre"
+                  type="text"
+                  required
+                  maxlength="100"
+                  placeholder="Ej. 3° de Secundaria, Lic. en Informática"
+                  class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-200"
+                />
+              </div>
+
+              <div>
+                <label for="curso-codigo" class="mb-1 block text-sm font-medium">
+                  Código del curso
+                </label>
+                <input
+                  id="curso-codigo"
+                  name="codigo"
+                  type="text"
+                  required
+                  maxlength="15"
+                  pattern="[A-Za-z0-9\-]+"
+                  title="Solo letras, números y guiones"
+                  placeholder="Ej. SEC-3A"
+                  class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm uppercase focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-200"
+                />
+              </div>
+
+              <div>
+                <label for="curso-nivel" class="mb-1 block text-sm font-medium">
+                  Nivel académico
+                </label>
+                <select
+                  id="curso-nivel"
+                  name="nivel"
+                  required
+                  class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-200"
+                >
+                  <option value="">Seleccionar…</option>
+                  <option value="preescolar">Preescolar</option>
+                  <option value="primaria">Primaria</option>
+                  <option value="secundaria">Secundaria</option>
+                  <option value="preparatoria">Preparatoria</option>
+                  <option value="licenciatura">Licenciatura</option>
+                  <option value="posgrado">Posgrado</option>
+                </select>
+              </div>
+            </div>
+
+            <p
+              id="form-curso-error"
+              class="hidden text-sm text-red-600"
+              role="alert"
+            ></p>
+
+            <div class="flex justify-end">
+              <button
+                type="submit"
+                class="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-300"
+              >
+                Crear curso
+              </button>
+            </div>
+          </form>
+
+          <div>
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-semibold text-slate-900">
+                Cursos en
+                <span id="curso-sede-nombre" class="text-violet-700"></span>
+              </h3>
+              <span
+                id="contador-cursos"
+                class="rounded-full bg-slate-200 px-2.5 py-0.5 text-xs font-medium text-slate-700"
+              >
+                0
+              </span>
+            </div>
+
+            <p
+              id="lista-cursos-vacia"
+              class="mt-3 rounded-xl border border-dashed border-slate-300 bg-white px-6 py-8 text-center text-sm text-slate-500"
+            >
+              Esta sede aún no tiene cursos registrados.
+            </p>
+
+            <ul id="lista-cursos" class="mt-3 hidden space-y-2"></ul>
+          </div>
+        </div>
+      </section>
     </main>
 
     <div
