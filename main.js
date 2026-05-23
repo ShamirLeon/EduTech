@@ -43,6 +43,22 @@ const listaDocentesVacia = document.getElementById("lista-docentes-vacia");
 const contadorDocentes = document.getElementById("contador-docentes");
 const docenteCursoNombre = document.getElementById("docente-curso-nombre");
 
+const estudiantesSinInstituciones = document.getElementById(
+  "estudiantes-sin-instituciones",
+);
+const estudiantesSinSedes = document.getElementById("estudiantes-sin-sedes");
+const estudiantesSinCursos = document.getElementById("estudiantes-sin-cursos");
+const estudiantesPanel = document.getElementById("estudiantes-panel");
+const selectInstitucionEstudiante = document.getElementById("institucion-estudiante");
+const selectSedeEstudiante = document.getElementById("sede-estudiante");
+const selectCursoEstudiante = document.getElementById("curso-estudiante");
+const formEstudiante = document.getElementById("form-estudiante");
+const formEstudianteError = document.getElementById("form-estudiante-error");
+const listaEstudiantes = document.getElementById("lista-estudiantes");
+const listaEstudiantesVacia = document.getElementById("lista-estudiantes-vacia");
+const contadorEstudiantes = document.getElementById("contador-estudiantes");
+const estudianteCursoNombre = document.getElementById("estudiante-curso-nombre");
+
 const TIPO_LABEL = {
   colegio: "Colegio",
   instituto: "Instituto",
@@ -66,6 +82,7 @@ function normalizarInstitucion(inst) {
       cursos: (sede.cursos ?? []).map((curso) => ({
         ...curso,
         docentes: curso.docentes ?? [],
+        estudiantes: curso.estudiantes ?? [],
       })),
     })),
   };
@@ -158,14 +175,11 @@ function obtenerSedeSeleccionada(selectInst, selectSede) {
   return { institucion, sede };
 }
 
-function obtenerCursoSeleccionado() {
-  const seleccion = obtenerSedeSeleccionada(
-    selectInstitucionDocente,
-    selectSedeDocente,
-  );
+function obtenerCursoSeleccionado(selectInst, selectSede, selectCurso) {
+  const seleccion = obtenerSedeSeleccionada(selectInst, selectSede);
   if (!seleccion) return null;
 
-  const cursoId = selectCursoDocente.value;
+  const cursoId = selectCurso.value;
   if (!cursoId) return null;
 
   const curso = seleccion.sede.cursos.find((c) => c.id === cursoId);
@@ -188,6 +202,24 @@ function codigoDocenteEnInstitucion(institucion, codigo) {
   return institucion.sedes.some((sede) =>
     sede.cursos.some((curso) =>
       curso.docentes.some((d) => d.codigo === normalizado),
+    ),
+  );
+}
+
+function contarEstudiantes(institucion) {
+  return institucion.sedes.reduce(
+    (total, sede) =>
+      total +
+      sede.cursos.reduce((suma, curso) => suma + curso.estudiantes.length, 0),
+    0,
+  );
+}
+
+function matriculaEnInstitucion(institucion, matricula) {
+  const normalizado = normalizarCodigo(matricula);
+  return institucion.sedes.some((sede) =>
+    sede.cursos.some((curso) =>
+      curso.estudiantes.some((e) => e.matricula === normalizado),
     ),
   );
 }
@@ -220,6 +252,7 @@ function crearTarjeta(institucion) {
     0,
   );
   const numDocentes = contarDocentes(institucion);
+  const numEstudiantes = contarEstudiantes(institucion);
   const li = document.createElement("li");
   li.className = "rounded-xl border border-slate-200 bg-white p-4 shadow-sm";
   li.innerHTML = `
@@ -232,7 +265,7 @@ function crearTarjeta(institucion) {
         Acceso habilitado
       </span>
     </div>
-    <dl class="mt-3 grid gap-2 text-sm sm:grid-cols-3 lg:grid-cols-6">
+    <dl class="mt-3 grid gap-2 text-sm sm:grid-cols-3 lg:grid-cols-7">
       <div>
         <dt class="text-xs text-slate-500">Código</dt>
         <dd class="font-mono font-medium">${escapeHtml(institucion.codigo)}</dd>
@@ -252,6 +285,10 @@ function crearTarjeta(institucion) {
       <div>
         <dt class="text-xs text-slate-500">Docentes</dt>
         <dd>${numDocentes}</dd>
+      </div>
+      <div>
+        <dt class="text-xs text-slate-500">Estudiantes</dt>
+        <dd>${numEstudiantes}</dd>
       </div>
       <div>
         <dt class="text-xs text-slate-500">Registrada</dt>
@@ -281,6 +318,7 @@ function renderizarLista() {
     renderizarPanelSedes();
     renderizarPanelCursos();
     renderizarPanelDocentes();
+    renderizarPanelEstudiantes();
     return;
   }
 
@@ -303,6 +341,7 @@ function renderizarLista() {
   renderizarPanelSedes();
   renderizarPanelCursos();
   renderizarPanelDocentes();
+  renderizarPanelEstudiantes();
 }
 
 function renderizarPanelSedes() {
@@ -467,9 +506,19 @@ function crearTarjetaCurso(curso, institucionId, sedeId) {
       <p class="mt-1 text-xs text-slate-400">
         <span class="font-mono">${escapeHtml(curso.codigo)}</span>
         · ${curso.docentes.length} docente${curso.docentes.length === 1 ? "" : "s"}
+        · ${curso.estudiantes.length} estudiante${curso.estudiantes.length === 1 ? "" : "s"}
       </p>
     </div>
     <div class="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center">
+      <button
+        type="button"
+        data-inst-id="${institucionId}"
+        data-sede-id="${sedeId}"
+        data-curso-id="${curso.id}"
+        class="btn-gestionar-estudiantes text-sm font-medium text-rose-600 hover:text-rose-800"
+      >
+        Estudiantes →
+      </button>
       <button
         type="button"
         data-inst-id="${institucionId}"
@@ -536,6 +585,18 @@ function renderizarCursos() {
         renderizarDocentes();
         irAPanel(docentesPanel);
       });
+      tarjeta
+        .querySelector(".btn-gestionar-estudiantes")
+        .addEventListener("click", (e) => {
+          const { instId, sedeId, cursoId } = e.currentTarget.dataset;
+          selectInstitucionEstudiante.value = instId;
+          renderizarSelectSedesEstudiantes();
+          selectSedeEstudiante.value = sedeId;
+          renderizarSelectCursosEstudiantes();
+          selectCursoEstudiante.value = cursoId;
+          renderizarEstudiantes();
+          irAPanel(estudiantesPanel);
+        });
       listaCursos.appendChild(tarjeta);
     });
 }
@@ -657,7 +718,11 @@ function crearTarjetaDocente(docente, institucionId, sedeId, cursoId) {
 }
 
 function renderizarDocentes() {
-  const seleccion = obtenerCursoSeleccionado();
+  const seleccion = obtenerCursoSeleccionado(
+    selectInstitucionDocente,
+    selectSedeDocente,
+    selectCursoDocente,
+  );
   if (!seleccion) return;
 
   const { institucion, sede, curso } = seleccion;
@@ -692,6 +757,162 @@ function renderizarDocentes() {
           eliminarDocente(institucion.id, sede.id, curso.id, docente.id),
         );
       listaDocentes.appendChild(tarjeta);
+    });
+}
+
+function renderizarPanelEstudiantes() {
+  const instituciones = cargarInstituciones();
+
+  if (instituciones.length === 0) {
+    estudiantesSinInstituciones.classList.remove("hidden");
+    estudiantesSinSedes.classList.add("hidden");
+    estudiantesSinCursos.classList.add("hidden");
+    estudiantesPanel.classList.add("hidden");
+    return;
+  }
+
+  estudiantesSinInstituciones.classList.add("hidden");
+
+  const valorInstPrevio = selectInstitucionEstudiante.value;
+  selectInstitucionEstudiante.innerHTML = opcionesInstituciones(instituciones);
+
+  const existeInst = instituciones.some((i) => i.id === valorInstPrevio);
+  selectInstitucionEstudiante.value = existeInst
+    ? valorInstPrevio
+    : instituciones[0].id;
+
+  renderizarSelectSedesEstudiantes();
+}
+
+function renderizarSelectSedesEstudiantes() {
+  const institucion = obtenerInstitucionPorId(selectInstitucionEstudiante.value);
+  if (!institucion) return;
+
+  const sedes = institucion.sedes;
+
+  if (sedes.length === 0) {
+    estudiantesSinSedes.classList.remove("hidden");
+    estudiantesSinCursos.classList.add("hidden");
+    estudiantesPanel.classList.add("hidden");
+    return;
+  }
+
+  estudiantesSinSedes.classList.add("hidden");
+
+  const valorSedePrevio = selectSedeEstudiante.value;
+  selectSedeEstudiante.innerHTML = sedes
+    .slice()
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"))
+    .map(
+      (sede) =>
+        `<option value="${sede.id}">${escapeHtml(sede.nombre)} (${escapeHtml(sede.codigo)})</option>`,
+    )
+    .join("");
+
+  const existeSede = sedes.some((s) => s.id === valorSedePrevio);
+  selectSedeEstudiante.value = existeSede ? valorSedePrevio : sedes[0].id;
+
+  renderizarSelectCursosEstudiantes();
+}
+
+function renderizarSelectCursosEstudiantes() {
+  const seleccion = obtenerSedeSeleccionada(
+    selectInstitucionEstudiante,
+    selectSedeEstudiante,
+  );
+  if (!seleccion) return;
+
+  const cursos = seleccion.sede.cursos;
+
+  if (cursos.length === 0) {
+    estudiantesSinCursos.classList.remove("hidden");
+    estudiantesPanel.classList.add("hidden");
+    return;
+  }
+
+  estudiantesSinCursos.classList.add("hidden");
+  estudiantesPanel.classList.remove("hidden");
+
+  const valorCursoPrevio = selectCursoEstudiante.value;
+  selectCursoEstudiante.innerHTML = cursos
+    .slice()
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"))
+    .map(
+      (curso) =>
+        `<option value="${curso.id}">${escapeHtml(curso.nombre)} (${escapeHtml(curso.codigo)})</option>`,
+    )
+    .join("");
+
+  const existeCurso = cursos.some((c) => c.id === valorCursoPrevio);
+  selectCursoEstudiante.value = existeCurso ? valorCursoPrevio : cursos[0].id;
+
+  renderizarEstudiantes();
+}
+
+function crearTarjetaEstudiante(estudiante, institucionId, sedeId, cursoId) {
+  const li = document.createElement("li");
+  li.className =
+    "flex flex-wrap items-start justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3";
+  li.innerHTML = `
+    <div class="min-w-0 flex-1">
+      <p class="font-medium text-slate-900">${escapeHtml(estudiante.nombre)}</p>
+      <p class="mt-0.5 text-sm text-slate-500">${escapeHtml(estudiante.correo)}</p>
+      <p class="mt-1 font-mono text-xs text-slate-400">${escapeHtml(estudiante.matricula)}</p>
+    </div>
+    <button
+      type="button"
+      data-estudiante-id="${estudiante.id}"
+      data-curso-id="${cursoId}"
+      data-sede-id="${sedeId}"
+      data-inst-id="${institucionId}"
+      class="btn-eliminar-estudiante shrink-0 text-sm text-red-600 hover:text-red-800"
+    >
+      Eliminar
+    </button>
+  `;
+  return li;
+}
+
+function renderizarEstudiantes() {
+  const seleccion = obtenerCursoSeleccionado(
+    selectInstitucionEstudiante,
+    selectSedeEstudiante,
+    selectCursoEstudiante,
+  );
+  if (!seleccion) return;
+
+  const { institucion, sede, curso } = seleccion;
+  estudianteCursoNombre.textContent = `${curso.nombre} · ${sede.nombre}`;
+
+  const estudiantes = curso.estudiantes;
+  contadorEstudiantes.textContent = String(estudiantes.length);
+  listaEstudiantes.innerHTML = "";
+
+  if (estudiantes.length === 0) {
+    listaEstudiantes.classList.add("hidden");
+    listaEstudiantesVacia.classList.remove("hidden");
+    return;
+  }
+
+  listaEstudiantesVacia.classList.add("hidden");
+  listaEstudiantes.classList.remove("hidden");
+
+  estudiantes
+    .slice()
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"))
+    .forEach((estudiante) => {
+      const tarjeta = crearTarjetaEstudiante(
+        estudiante,
+        institucion.id,
+        sede.id,
+        curso.id,
+      );
+      tarjeta
+        .querySelector(".btn-eliminar-estudiante")
+        .addEventListener("click", () =>
+          eliminarEstudiante(institucion.id, sede.id, curso.id, estudiante.id),
+        );
+      listaEstudiantes.appendChild(tarjeta);
     });
 }
 
@@ -776,6 +997,7 @@ function registrarCurso(institucionId, sedeId, datos) {
     nivel: datos.nivel,
     creadaEn: new Date().toISOString(),
     docentes: [],
+    estudiantes: [],
   };
 
   instituciones[indiceInst].sedes[indiceSede].cursos = [nuevo, ...cursos];
@@ -883,6 +1105,65 @@ function eliminarDocente(institucionId, sedeId, cursoId, docenteId) {
   mostrarToast(`Docente "${docente.nombre}" eliminado.`);
 }
 
+function registrarEstudiante(institucionId, sedeId, cursoId, datos) {
+  const instituciones = cargarInstituciones();
+  const indices = encontrarCurso(instituciones, institucionId, sedeId, cursoId);
+  if (!indices) return false;
+
+  const institucion = instituciones[indices.indiceInst];
+  const matricula = normalizarCodigo(datos.matricula);
+
+  if (matriculaEnInstitucion(institucion, matricula)) {
+    mostrarError(
+      formEstudianteError,
+      `Ya existe un estudiante con la matrícula "${matricula}" en esta institución.`,
+    );
+    return false;
+  }
+
+  const estudiantes =
+    instituciones[indices.indiceInst].sedes[indices.indiceSede].cursos[
+      indices.indiceCurso
+    ].estudiantes;
+
+  const nuevo = {
+    id: crypto.randomUUID(),
+    nombre: datos.nombre.trim(),
+    matricula,
+    correo: datos.correo.trim().toLowerCase(),
+    creadaEn: new Date().toISOString(),
+  };
+
+  instituciones[indices.indiceInst].sedes[indices.indiceSede].cursos[
+    indices.indiceCurso
+  ].estudiantes = [nuevo, ...estudiantes];
+
+  guardarInstituciones(instituciones);
+  return nuevo;
+}
+
+function eliminarEstudiante(institucionId, sedeId, cursoId, estudianteId) {
+  const instituciones = cargarInstituciones();
+  const indices = encontrarCurso(instituciones, institucionId, sedeId, cursoId);
+  if (!indices) return;
+
+  const estudiantes =
+    instituciones[indices.indiceInst].sedes[indices.indiceSede].cursos[
+      indices.indiceCurso
+    ].estudiantes;
+
+  const estudiante = estudiantes.find((e) => e.id === estudianteId);
+  if (!estudiante) return;
+
+  instituciones[indices.indiceInst].sedes[indices.indiceSede].cursos[
+    indices.indiceCurso
+  ].estudiantes = estudiantes.filter((e) => e.id !== estudianteId);
+
+  guardarInstituciones(instituciones);
+  renderizarLista();
+  mostrarToast(`Estudiante "${estudiante.nombre}" eliminado.`);
+}
+
 form.addEventListener("submit", (event) => {
   event.preventDefault();
   ocultarError(formError);
@@ -955,7 +1236,11 @@ formDocente.addEventListener("submit", (event) => {
   event.preventDefault();
   ocultarError(formDocenteError);
 
-  const seleccion = obtenerCursoSeleccionado();
+  const seleccion = obtenerCursoSeleccionado(
+    selectInstitucionDocente,
+    selectSedeDocente,
+    selectCursoDocente,
+  );
   if (!seleccion) return;
 
   const formData = new FormData(formDocente);
@@ -981,8 +1266,41 @@ formDocente.addEventListener("submit", (event) => {
 selectInstitucion.addEventListener("change", renderizarSedes);
 selectInstitucionCurso.addEventListener("change", renderizarSelectSedesCursos);
 selectSedeCurso.addEventListener("change", renderizarCursos);
+formEstudiante.addEventListener("submit", (event) => {
+  event.preventDefault();
+  ocultarError(formEstudianteError);
+
+  const seleccion = obtenerCursoSeleccionado(
+    selectInstitucionEstudiante,
+    selectSedeEstudiante,
+    selectCursoEstudiante,
+  );
+  if (!seleccion) return;
+
+  const formData = new FormData(formEstudiante);
+  const registrado = registrarEstudiante(
+    seleccion.institucion.id,
+    seleccion.sede.id,
+    seleccion.curso.id,
+    {
+      nombre: formData.get("nombre"),
+      matricula: formData.get("matricula"),
+      correo: formData.get("correo"),
+    },
+  );
+
+  if (!registrado) return;
+
+  formEstudiante.reset();
+  renderizarLista();
+  mostrarToast(`Estudiante "${registrado.nombre}" registrado.`);
+});
+
 selectInstitucionDocente.addEventListener("change", renderizarSelectSedesDocentes);
 selectSedeDocente.addEventListener("change", renderizarSelectCursosDocentes);
 selectCursoDocente.addEventListener("change", renderizarDocentes);
+selectInstitucionEstudiante.addEventListener("change", renderizarSelectSedesEstudiantes);
+selectSedeEstudiante.addEventListener("change", renderizarSelectCursosEstudiantes);
+selectCursoEstudiante.addEventListener("change", renderizarEstudiantes);
 
 renderizarLista();
