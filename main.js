@@ -29,6 +29,20 @@ const listaCursosVacia = document.getElementById("lista-cursos-vacia");
 const contadorCursos = document.getElementById("contador-cursos");
 const cursoSedeNombre = document.getElementById("curso-sede-nombre");
 
+const docentesSinInstituciones = document.getElementById("docentes-sin-instituciones");
+const docentesSinSedes = document.getElementById("docentes-sin-sedes");
+const docentesSinCursos = document.getElementById("docentes-sin-cursos");
+const docentesPanel = document.getElementById("docentes-panel");
+const selectInstitucionDocente = document.getElementById("institucion-docente");
+const selectSedeDocente = document.getElementById("sede-docente");
+const selectCursoDocente = document.getElementById("curso-docente");
+const formDocente = document.getElementById("form-docente");
+const formDocenteError = document.getElementById("form-docente-error");
+const listaDocentes = document.getElementById("lista-docentes");
+const listaDocentesVacia = document.getElementById("lista-docentes-vacia");
+const contadorDocentes = document.getElementById("contador-docentes");
+const docenteCursoNombre = document.getElementById("docente-curso-nombre");
+
 const TIPO_LABEL = {
   colegio: "Colegio",
   instituto: "Instituto",
@@ -49,7 +63,10 @@ function normalizarInstitucion(inst) {
     ...inst,
     sedes: (inst.sedes ?? []).map((sede) => ({
       ...sede,
-      cursos: sede.cursos ?? [],
+      cursos: (sede.cursos ?? []).map((curso) => ({
+        ...curso,
+        docentes: curso.docentes ?? [],
+      })),
     })),
   };
 }
@@ -127,9 +144,9 @@ function obtenerInstitucionSeleccionadaSedes() {
   return obtenerInstitucionPorId(id);
 }
 
-function obtenerSedeSeleccionada() {
-  const instId = selectInstitucionCurso.value;
-  const sedeId = selectSedeCurso.value;
+function obtenerSedeSeleccionada(selectInst, selectSede) {
+  const instId = selectInst.value;
+  const sedeId = selectSede.value;
   if (!instId || !sedeId) return null;
 
   const institucion = obtenerInstitucionPorId(instId);
@@ -139,6 +156,57 @@ function obtenerSedeSeleccionada() {
   if (!sede) return null;
 
   return { institucion, sede };
+}
+
+function obtenerCursoSeleccionado() {
+  const seleccion = obtenerSedeSeleccionada(
+    selectInstitucionDocente,
+    selectSedeDocente,
+  );
+  if (!seleccion) return null;
+
+  const cursoId = selectCursoDocente.value;
+  if (!cursoId) return null;
+
+  const curso = seleccion.sede.cursos.find((c) => c.id === cursoId);
+  if (!curso) return null;
+
+  return { ...seleccion, curso };
+}
+
+function contarDocentes(institucion) {
+  return institucion.sedes.reduce(
+    (total, sede) =>
+      total +
+      sede.cursos.reduce((suma, curso) => suma + curso.docentes.length, 0),
+    0,
+  );
+}
+
+function codigoDocenteEnInstitucion(institucion, codigo) {
+  const normalizado = normalizarCodigo(codigo);
+  return institucion.sedes.some((sede) =>
+    sede.cursos.some((curso) =>
+      curso.docentes.some((d) => d.codigo === normalizado),
+    ),
+  );
+}
+
+function encontrarCurso(instituciones, institucionId, sedeId, cursoId) {
+  const indiceInst = instituciones.findIndex((i) => i.id === institucionId);
+  if (indiceInst === -1) return null;
+
+  const indiceSede = instituciones[indiceInst].sedes.findIndex(
+    (s) => s.id === sedeId,
+  );
+  if (indiceSede === -1) return null;
+
+  const indiceCurso = instituciones[indiceInst].sedes[indiceSede].cursos.findIndex(
+    (c) => c.id === cursoId,
+  );
+  if (indiceCurso === -1) return null;
+
+  return { indiceInst, indiceSede, indiceCurso };
 }
 
 function irAPanel(elemento) {
@@ -151,6 +219,7 @@ function crearTarjeta(institucion) {
     (total, sede) => total + sede.cursos.length,
     0,
   );
+  const numDocentes = contarDocentes(institucion);
   const li = document.createElement("li");
   li.className = "rounded-xl border border-slate-200 bg-white p-4 shadow-sm";
   li.innerHTML = `
@@ -163,7 +232,7 @@ function crearTarjeta(institucion) {
         Acceso habilitado
       </span>
     </div>
-    <dl class="mt-3 grid gap-2 text-sm sm:grid-cols-5">
+    <dl class="mt-3 grid gap-2 text-sm sm:grid-cols-3 lg:grid-cols-6">
       <div>
         <dt class="text-xs text-slate-500">Código</dt>
         <dd class="font-mono font-medium">${escapeHtml(institucion.codigo)}</dd>
@@ -179,6 +248,10 @@ function crearTarjeta(institucion) {
       <div>
         <dt class="text-xs text-slate-500">Cursos</dt>
         <dd>${numCursos}</dd>
+      </div>
+      <div>
+        <dt class="text-xs text-slate-500">Docentes</dt>
+        <dd>${numDocentes}</dd>
       </div>
       <div>
         <dt class="text-xs text-slate-500">Registrada</dt>
@@ -207,6 +280,7 @@ function renderizarLista() {
     listaVacia.classList.remove("hidden");
     renderizarPanelSedes();
     renderizarPanelCursos();
+    renderizarPanelDocentes();
     return;
   }
 
@@ -228,6 +302,7 @@ function renderizarLista() {
 
   renderizarPanelSedes();
   renderizarPanelCursos();
+  renderizarPanelDocentes();
 }
 
 function renderizarPanelSedes() {
@@ -389,23 +464,40 @@ function crearTarjetaCurso(curso, institucionId, sedeId) {
       <p class="mt-0.5 text-sm text-slate-500">
         ${escapeHtml(NIVEL_LABEL[curso.nivel] ?? curso.nivel)}
       </p>
-      <p class="mt-1 font-mono text-xs text-slate-400">${escapeHtml(curso.codigo)}</p>
+      <p class="mt-1 text-xs text-slate-400">
+        <span class="font-mono">${escapeHtml(curso.codigo)}</span>
+        · ${curso.docentes.length} docente${curso.docentes.length === 1 ? "" : "s"}
+      </p>
     </div>
-    <button
-      type="button"
-      data-curso-id="${curso.id}"
-      data-sede-id="${sedeId}"
-      data-inst-id="${institucionId}"
-      class="btn-eliminar-curso shrink-0 text-sm text-red-600 hover:text-red-800"
-    >
-      Eliminar
-    </button>
+    <div class="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center">
+      <button
+        type="button"
+        data-inst-id="${institucionId}"
+        data-sede-id="${sedeId}"
+        data-curso-id="${curso.id}"
+        class="btn-gestionar-docentes text-sm font-medium text-amber-600 hover:text-amber-800"
+      >
+        Docentes →
+      </button>
+      <button
+        type="button"
+        data-curso-id="${curso.id}"
+        data-sede-id="${sedeId}"
+        data-inst-id="${institucionId}"
+        class="btn-eliminar-curso text-sm text-red-600 hover:text-red-800"
+      >
+        Eliminar
+      </button>
+    </div>
   `;
   return li;
 }
 
 function renderizarCursos() {
-  const seleccion = obtenerSedeSeleccionada();
+  const seleccion = obtenerSedeSeleccionada(
+    selectInstitucionCurso,
+    selectSedeCurso,
+  );
   if (!seleccion) return;
 
   const { institucion, sede } = seleccion;
@@ -434,7 +526,172 @@ function renderizarCursos() {
         .addEventListener("click", () =>
           eliminarCurso(institucion.id, sede.id, curso.id),
         );
+      tarjeta.querySelector(".btn-gestionar-docentes").addEventListener("click", (e) => {
+        const { instId, sedeId, cursoId } = e.currentTarget.dataset;
+        selectInstitucionDocente.value = instId;
+        renderizarSelectSedesDocentes();
+        selectSedeDocente.value = sedeId;
+        renderizarSelectCursosDocentes();
+        selectCursoDocente.value = cursoId;
+        renderizarDocentes();
+        irAPanel(docentesPanel);
+      });
       listaCursos.appendChild(tarjeta);
+    });
+}
+
+function renderizarPanelDocentes() {
+  const instituciones = cargarInstituciones();
+
+  if (instituciones.length === 0) {
+    docentesSinInstituciones.classList.remove("hidden");
+    docentesSinSedes.classList.add("hidden");
+    docentesSinCursos.classList.add("hidden");
+    docentesPanel.classList.add("hidden");
+    return;
+  }
+
+  docentesSinInstituciones.classList.add("hidden");
+
+  const valorInstPrevio = selectInstitucionDocente.value;
+  selectInstitucionDocente.innerHTML = opcionesInstituciones(instituciones);
+
+  const existeInst = instituciones.some((i) => i.id === valorInstPrevio);
+  selectInstitucionDocente.value = existeInst
+    ? valorInstPrevio
+    : instituciones[0].id;
+
+  renderizarSelectSedesDocentes();
+}
+
+function renderizarSelectSedesDocentes() {
+  const institucion = obtenerInstitucionPorId(selectInstitucionDocente.value);
+  if (!institucion) return;
+
+  const sedes = institucion.sedes;
+
+  if (sedes.length === 0) {
+    docentesSinSedes.classList.remove("hidden");
+    docentesSinCursos.classList.add("hidden");
+    docentesPanel.classList.add("hidden");
+    return;
+  }
+
+  docentesSinSedes.classList.add("hidden");
+
+  const valorSedePrevio = selectSedeDocente.value;
+  selectSedeDocente.innerHTML = sedes
+    .slice()
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"))
+    .map(
+      (sede) =>
+        `<option value="${sede.id}">${escapeHtml(sede.nombre)} (${escapeHtml(sede.codigo)})</option>`,
+    )
+    .join("");
+
+  const existeSede = sedes.some((s) => s.id === valorSedePrevio);
+  selectSedeDocente.value = existeSede ? valorSedePrevio : sedes[0].id;
+
+  renderizarSelectCursosDocentes();
+}
+
+function renderizarSelectCursosDocentes() {
+  const seleccion = obtenerSedeSeleccionada(
+    selectInstitucionDocente,
+    selectSedeDocente,
+  );
+  if (!seleccion) return;
+
+  const cursos = seleccion.sede.cursos;
+
+  if (cursos.length === 0) {
+    docentesSinCursos.classList.remove("hidden");
+    docentesPanel.classList.add("hidden");
+    return;
+  }
+
+  docentesSinCursos.classList.add("hidden");
+  docentesPanel.classList.remove("hidden");
+
+  const valorCursoPrevio = selectCursoDocente.value;
+  selectCursoDocente.innerHTML = cursos
+    .slice()
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"))
+    .map(
+      (curso) =>
+        `<option value="${curso.id}">${escapeHtml(curso.nombre)} (${escapeHtml(curso.codigo)})</option>`,
+    )
+    .join("");
+
+  const existeCurso = cursos.some((c) => c.id === valorCursoPrevio);
+  selectCursoDocente.value = existeCurso ? valorCursoPrevio : cursos[0].id;
+
+  renderizarDocentes();
+}
+
+function crearTarjetaDocente(docente, institucionId, sedeId, cursoId) {
+  const li = document.createElement("li");
+  li.className =
+    "flex flex-wrap items-start justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3";
+  li.innerHTML = `
+    <div class="min-w-0 flex-1">
+      <p class="font-medium text-slate-900">${escapeHtml(docente.nombre)}</p>
+      <p class="mt-0.5 text-sm text-slate-500">${escapeHtml(docente.correo)}</p>
+      <p class="mt-1 text-xs text-slate-400">
+        <span class="font-mono">${escapeHtml(docente.codigo)}</span>
+        · ${escapeHtml(docente.materia)}
+      </p>
+    </div>
+    <button
+      type="button"
+      data-docente-id="${docente.id}"
+      data-curso-id="${cursoId}"
+      data-sede-id="${sedeId}"
+      data-inst-id="${institucionId}"
+      class="btn-eliminar-docente shrink-0 text-sm text-red-600 hover:text-red-800"
+    >
+      Eliminar
+    </button>
+  `;
+  return li;
+}
+
+function renderizarDocentes() {
+  const seleccion = obtenerCursoSeleccionado();
+  if (!seleccion) return;
+
+  const { institucion, sede, curso } = seleccion;
+  docenteCursoNombre.textContent = `${curso.nombre} · ${sede.nombre}`;
+
+  const docentes = curso.docentes;
+  contadorDocentes.textContent = String(docentes.length);
+  listaDocentes.innerHTML = "";
+
+  if (docentes.length === 0) {
+    listaDocentes.classList.add("hidden");
+    listaDocentesVacia.classList.remove("hidden");
+    return;
+  }
+
+  listaDocentesVacia.classList.add("hidden");
+  listaDocentes.classList.remove("hidden");
+
+  docentes
+    .slice()
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"))
+    .forEach((docente) => {
+      const tarjeta = crearTarjetaDocente(
+        docente,
+        institucion.id,
+        sede.id,
+        curso.id,
+      );
+      tarjeta
+        .querySelector(".btn-eliminar-docente")
+        .addEventListener("click", () =>
+          eliminarDocente(institucion.id, sede.id, curso.id, docente.id),
+        );
+      listaDocentes.appendChild(tarjeta);
     });
 }
 
@@ -518,6 +775,7 @@ function registrarCurso(institucionId, sedeId, datos) {
     codigo,
     nivel: datos.nivel,
     creadaEn: new Date().toISOString(),
+    docentes: [],
   };
 
   instituciones[indiceInst].sedes[indiceSede].cursos = [nuevo, ...cursos];
@@ -565,6 +823,66 @@ function eliminarCurso(institucionId, sedeId, cursoId) {
   mostrarToast(`Curso "${curso.nombre}" eliminado.`);
 }
 
+function registrarDocente(institucionId, sedeId, cursoId, datos) {
+  const instituciones = cargarInstituciones();
+  const indices = encontrarCurso(instituciones, institucionId, sedeId, cursoId);
+  if (!indices) return false;
+
+  const institucion = instituciones[indices.indiceInst];
+  const codigo = normalizarCodigo(datos.codigo);
+
+  if (codigoDocenteEnInstitucion(institucion, codigo)) {
+    mostrarError(
+      formDocenteError,
+      `Ya existe un docente con el código "${codigo}" en esta institución.`,
+    );
+    return false;
+  }
+
+  const docentes =
+    instituciones[indices.indiceInst].sedes[indices.indiceSede].cursos[
+      indices.indiceCurso
+    ].docentes;
+
+  const nuevo = {
+    id: crypto.randomUUID(),
+    nombre: datos.nombre.trim(),
+    codigo,
+    correo: datos.correo.trim().toLowerCase(),
+    materia: datos.materia.trim(),
+    creadaEn: new Date().toISOString(),
+  };
+
+  instituciones[indices.indiceInst].sedes[indices.indiceSede].cursos[
+    indices.indiceCurso
+  ].docentes = [nuevo, ...docentes];
+
+  guardarInstituciones(instituciones);
+  return nuevo;
+}
+
+function eliminarDocente(institucionId, sedeId, cursoId, docenteId) {
+  const instituciones = cargarInstituciones();
+  const indices = encontrarCurso(instituciones, institucionId, sedeId, cursoId);
+  if (!indices) return;
+
+  const docentes =
+    instituciones[indices.indiceInst].sedes[indices.indiceSede].cursos[
+      indices.indiceCurso
+    ].docentes;
+
+  const docente = docentes.find((d) => d.id === docenteId);
+  if (!docente) return;
+
+  instituciones[indices.indiceInst].sedes[indices.indiceSede].cursos[
+    indices.indiceCurso
+  ].docentes = docentes.filter((d) => d.id !== docenteId);
+
+  guardarInstituciones(instituciones);
+  renderizarLista();
+  mostrarToast(`Docente "${docente.nombre}" eliminado.`);
+}
+
 form.addEventListener("submit", (event) => {
   event.preventDefault();
   ocultarError(formError);
@@ -609,7 +927,10 @@ formCurso.addEventListener("submit", (event) => {
   event.preventDefault();
   ocultarError(formCursoError);
 
-  const seleccion = obtenerSedeSeleccionada();
+  const seleccion = obtenerSedeSeleccionada(
+    selectInstitucionCurso,
+    selectSedeCurso,
+  );
   if (!seleccion) return;
 
   const formData = new FormData(formCurso);
@@ -630,8 +951,38 @@ formCurso.addEventListener("submit", (event) => {
   mostrarToast(`Curso "${registrado.nombre}" creado.`);
 });
 
+formDocente.addEventListener("submit", (event) => {
+  event.preventDefault();
+  ocultarError(formDocenteError);
+
+  const seleccion = obtenerCursoSeleccionado();
+  if (!seleccion) return;
+
+  const formData = new FormData(formDocente);
+  const registrado = registrarDocente(
+    seleccion.institucion.id,
+    seleccion.sede.id,
+    seleccion.curso.id,
+    {
+      nombre: formData.get("nombre"),
+      codigo: formData.get("codigo"),
+      correo: formData.get("correo"),
+      materia: formData.get("materia"),
+    },
+  );
+
+  if (!registrado) return;
+
+  formDocente.reset();
+  renderizarLista();
+  mostrarToast(`Docente "${registrado.nombre}" registrado.`);
+});
+
 selectInstitucion.addEventListener("change", renderizarSedes);
 selectInstitucionCurso.addEventListener("change", renderizarSelectSedesCursos);
 selectSedeCurso.addEventListener("change", renderizarCursos);
+selectInstitucionDocente.addEventListener("change", renderizarSelectSedesDocentes);
+selectSedeDocente.addEventListener("change", renderizarSelectCursosDocentes);
+selectCursoDocente.addEventListener("change", renderizarDocentes);
 
 renderizarLista();
